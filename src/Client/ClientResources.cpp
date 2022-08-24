@@ -1,11 +1,11 @@
-#include <Resources.hpp>
+#include <Client/ClientResources.hpp>
 #include <Nazara/Core/Primitive.hpp>
 #include <Nazara/Graphics/BasicMaterial.hpp>
 #include <Nazara/Graphics/Material.hpp>
 #include <Nazara/Graphics/MaterialPass.hpp>
 #include <Nazara/Utility/MaterialData.hpp>
 
-Resources::Resources()
+ClientResources::ClientResources()
 {
 	std::shared_ptr<Nz::Material> boxMat = LoadMaterialFromPath("assets/box.png");
 	std::shared_ptr<Nz::Material> floorMat = LoadMaterialFromPath("assets/dev_grey.png");
@@ -26,7 +26,7 @@ Resources::Resources()
 	LoadPlayerModel();
 }
 
-std::shared_ptr<Nz::GraphicalMesh> Resources::BuildMesh(const Nz::Primitive& primitive, Nz::Boxf& aabb)
+std::shared_ptr<Nz::GraphicalMesh> ClientResources::BuildMesh(const Nz::Primitive& primitive, Nz::Boxf& aabb)
 {
 	Nz::Mesh mesh;
 	mesh.CreateStatic();
@@ -37,7 +37,7 @@ std::shared_ptr<Nz::GraphicalMesh> Resources::BuildMesh(const Nz::Primitive& pri
 	return Nz::GraphicalMesh::BuildFromMesh(mesh);
 }
 
-std::shared_ptr<Nz::Model> Resources::BuildModel(const Nz::Primitive& primitive)
+std::shared_ptr<Nz::Model> ClientResources::BuildModel(const Nz::Primitive& primitive)
 {
 	Nz::Boxf aabb;
 	auto gfxMesh = BuildMesh(primitive, aabb);
@@ -45,7 +45,7 @@ std::shared_ptr<Nz::Model> Resources::BuildModel(const Nz::Primitive& primitive)
 	return std::make_shared<Nz::Model>(gfxMesh, aabb);
 }
 
-std::shared_ptr<Nz::Material> Resources::LoadMaterialFromPath(const std::filesystem::path& path)
+std::shared_ptr<Nz::Material> ClientResources::LoadMaterialFromPath(const std::filesystem::path& path)
 {
 	std::shared_ptr<Nz::MaterialPass> matPass = std::make_shared<Nz::MaterialPass>(Nz::BasicMaterial::GetSettings());
 	matPass->EnableDepthBuffer(true);
@@ -57,6 +57,7 @@ std::shared_ptr<Nz::Material> Resources::LoadMaterialFromPath(const std::filesys
 		std::shared_ptr<Nz::Texture> texture = Nz::Texture::LoadFromFile(path, texParams);
 
 		Nz::TextureSamplerInfo sampler;
+		sampler.anisotropyLevel = 8;
 		sampler.wrapModeU = Nz::SamplerWrap::Repeat;
 		sampler.wrapModeV = Nz::SamplerWrap::Repeat;
 
@@ -71,7 +72,7 @@ std::shared_ptr<Nz::Material> Resources::LoadMaterialFromPath(const std::filesys
 	return mat;
 }
 
-void Resources::LoadPlayerModel()
+void ClientResources::LoadPlayerModel()
 {
 	Nz::MeshParams meshParams;
 	meshParams.animated = false;

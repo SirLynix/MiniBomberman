@@ -1,8 +1,8 @@
 
-#include <Player.hpp>
+#include <Client/ClientPlayer.hpp>
 #include <Nazara/Platform/Keyboard.hpp>
 
-PlayerInputs Player::PollInputs()
+PlayerInputs ClientPlayer::PollInputs()
 {
 	PlayerInputs inputs;
 	inputs.moveDown = Nz::Keyboard::IsKeyPressed(Nz::Keyboard::VKey::Down);

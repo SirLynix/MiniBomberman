@@ -5,10 +5,10 @@
 #include <filesystem>
 #include <memory>
 
-struct Resources
+struct ClientResources
 {
 	public:
-		Resources();
+		ClientResources();
 
 		std::shared_ptr<Nz::Model> boxModel;
 		std::shared_ptr<Nz::Model> floorModel;
