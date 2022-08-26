@@ -7,9 +7,9 @@ class Map
 	public:
 		enum class CellType
 		{
-			Box,
-			Empty,
-			Stone
+			Box   = 1,
+			Empty = 0,
+			Stone = 2
 		};
 
 		Map() = default;

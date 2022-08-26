@@ -3,9 +3,18 @@
 #include <Nazara/Graphics/FramePipeline.hpp>
 #include <Nazara/Graphics/Systems.hpp>
 #include <Nazara/Utility/Components.hpp>
+#include <iostream>
+#include <stdexcept>
 
-ClientGame::ClientGame()
+ClientGame::ClientGame(const Nz::IpAddress& serverAddress)
 {
+	if (!m_networkHost.Create(Nz::NetProtocol::IPv6, 0, 1))
+		throw std::runtime_error("failed to create network host");
+
+	// Connect to server
+	m_serverPeer = m_networkHost.Connect(serverAddress);
+	WaitUntilConnected();
+
 	std::shared_ptr<Nz::RenderDevice> renderDevice = Nz::Graphics::Instance()->GetRenderDevice();
 
 	auto& renderSystem = GetSystemGraph().AddSystem<Nz::RenderSystem>();
@@ -25,6 +34,67 @@ bool ClientGame::OnUpdate(float elapsedTime)
 	if (!m_window->IsOpen())
 		return false;
 	
+	Nz::ENetEvent event;
+	if (m_networkHost.Service(&event, 0) > 0)
+	{
+		do
+		{
+			switch (event.type)
+			{
+				case Nz::ENetEventType::None:
+				case Nz::ENetEventType::IncomingConnect:
+					break;
+
+				case Nz::ENetEventType::Disconnect:
+				{
+					assert(event.peer == m_serverPeer);
+					std::cout << "Disconnected from server" << std::endl;
+					break;
+				}
+
+				case Nz::ENetEventType::OutgoingConnect:
+				{
+					assert(event.peer == m_serverPeer);
+					std::cout << "Connected to server" << std::endl;
+					break;
+				}
+
+				case Nz::ENetEventType::Receive:
+				{
+					assert(event.peer == m_serverPeer);
+					std::cout << "Received data from server" << std::endl;
+
+					Nz::NetPacket& netPacket = event.packet->data;
+
+					Nz::UInt16 netCode;
+					netPacket >> netCode;
+
+					if (netCode == 1)
+					{
+						std::cout << "Received map" << std::endl;
+
+						Nz::UInt8 width, height;
+						netPacket >> width >> height;
+
+						for (std::size_t y = 0; y < height; ++y)
+						{
+							for (std::size_t x = 0; x < width; ++x)
+							{
+								Nz::UInt8 cellType;
+								netPacket >> cellType;
+
+								m_map->UpdateCell(x, y, static_cast<Map::CellType>(cellType));
+							}
+						}
+
+					}
+					break;
+				}
+			}
+		}
+		while (m_networkHost.CheckEvents(&event));
+	}
+
 	m_window->ProcessEvents();
 
 	auto& playerNode = GetRegistry().get<Nz::NodeComponent>(m_debugPlayerEntity);
@@ -116,4 +186,32 @@ void ClientGame::SetupPlayerEntity()
 	playerGfx.AttachRenderable(m_resources.playerModel, 0xFFFFFFFF);
 
 	m_map->ClearCell(0, 0);
+}
+
+void ClientGame::WaitUntilConnected()
+{
+	Nz::Clock timeoutClock;
+	for (;;)
+	{
+		Nz::ENetEvent event;
+		if (m_networkHost.Service(&event, 100) > 0)
+		{
+			do
+			{
+				switch (event.type)
+				{
+					case Nz::ENetEventType::OutgoingConnect:
+					{
+						assert(event.peer == m_serverPeer);
+						std::cout << "Connected to server" << std::endl;
+						return;
+					}
+				}
+			}
+			while (m_networkHost.CheckEvents(&event));
+		}
+
+		if (timeoutClock.GetSeconds() > 5.f)
+			throw std::runtime_error("failed to connect to server");
+	}
 }

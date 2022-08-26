@@ -2,6 +2,8 @@
 
 #include <Nazara/Core/Systems/SystemGraph.hpp>
 #include <Nazara/Math/EulerAngles.hpp>
+#include <Nazara/Network/ENetHost.hpp>
+#include <Nazara/Network/IpAddress.hpp>
 #include <Nazara/Renderer/RenderWindow.hpp>
 #include <Client/ClientMap.hpp>
 #include <Client/ClientPlayer.hpp>
@@ -13,7 +15,7 @@
 class ClientGame : public Game
 {
 	public:
-		ClientGame();
+		ClientGame(const Nz::IpAddress& serverAddress);
 		ClientGame(const ClientGame&) = delete;
 		ClientGame(ClientGame&&) = delete;
 		~ClientGame() = default;
@@ -27,9 +29,12 @@ class ClientGame : public Game
 		
 		void SetupCamera();
 		void SetupPlayerEntity();
+		void WaitUntilConnected();
 
 		entt::entity m_cameraEntity;
 		entt::entity m_debugPlayerEntity;
+		Nz::ENetHost m_networkHost;
+		Nz::ENetPeer* m_serverPeer;
 		Nz::EulerAnglesf m_cameraRotation;
 		Nz::RenderWindow* m_window;
 		ClientResources m_resources;

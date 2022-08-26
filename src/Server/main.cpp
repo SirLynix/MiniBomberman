@@ -9,6 +9,14 @@ int main(int argc, char** argv)
 {
 	Nz::Modules<Nz::Network> nazara;
 
-	ServerGame game;
-	return game.Run();
+	try
+	{
+		ServerGame game;
+		return game.Run();
+	}
+	catch (const std::exception& e)
+	{
+		std::cerr << e.what() << std::endl;
+		return EXIT_FAILURE;
+	}
 }
