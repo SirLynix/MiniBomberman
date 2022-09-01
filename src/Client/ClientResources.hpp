@@ -10,6 +10,7 @@ struct ClientResources
 	public:
 		ClientResources();
 
+		std::shared_ptr<Nz::Model> bombModel;
 		std::shared_ptr<Nz::Model> boxModel;
 		std::shared_ptr<Nz::Model> floorModel;
 		std::shared_ptr<Nz::Model> playerModel;
@@ -20,6 +21,7 @@ struct ClientResources
 		static std::shared_ptr<Nz::Material> LoadMaterialFromPath(const std::filesystem::path& path);
 
 	private:
+		void LoadBombModel();
 		void LoadPlayerModel();
 
 };

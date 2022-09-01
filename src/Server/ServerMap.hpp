@@ -11,7 +11,7 @@ class ServerMap final : public Map
 		ServerMap(ServerMap&&) = delete;
 		~ServerMap() = default;
 
-		CellType GetCell(std::size_t x, std::size_t y) const;
+		CellType GetCellContent(std::size_t x, std::size_t y) const;
 
 		void UpdateCell(std::size_t x, std::size_t y, CellType cellType) override;
 

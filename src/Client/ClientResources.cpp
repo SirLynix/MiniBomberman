@@ -23,6 +23,7 @@ ClientResources::ClientResources()
 	stoneModel = std::make_shared<Nz::Model>(cubeMesh, boxAABB);
 	stoneModel->SetMaterial(0, stoneMat);
 
+	LoadBombModel();
 	LoadPlayerModel();
 }
 
@@ -72,6 +73,22 @@ std::shared_ptr<Nz::Material> ClientResources::LoadMaterialFromPath(const std::f
 	return mat;
 }
 
+void ClientResources::LoadBombModel()
+{
+	Nz::MeshParams meshParams;
+	meshParams.animated = false;
+	meshParams.vertexRotation = Nz::EulerAnglesf(-90.f, 90.f, 0.f);
+	meshParams.vertexScale = Nz::Vector3f(1.f / 5.f);
+
+	std::shared_ptr<Nz::Mesh> bombMesh = Nz::Mesh::LoadFromFile("assets/cartoon_bomb/cartoon_bomb.fbx", meshParams);
+	Nz::Boxf aabb = bombMesh->GetAABB();
+
+	std::shared_ptr<Nz::GraphicalMesh> bombGfxModel = Nz::GraphicalMesh::BuildFromMesh(*bombMesh);
+
+	bombModel = std::make_shared<Nz::Model>(bombGfxModel, aabb);
+	bombModel->SetMaterial(0, LoadMaterialFromPath("assets/cartoon_bomb/DefaultMaterial_Base_Color.png"));
+}
+
 void ClientResources::LoadPlayerModel()
 {
 	Nz::MeshParams meshParams;
@@ -86,24 +103,8 @@ void ClientResources::LoadPlayerModel()
 	
 	playerModel = std::make_shared<Nz::Model>(playerGfxMesh, aabb);
 
+	std::string matPath;
+	playerMesh->GetMaterialData(0).GetStringParameter(Nz::MaterialData::BaseColorTexturePath, &matPath);
 
-	std::shared_ptr<Nz::MaterialPass> matPass = std::make_shared<Nz::MaterialPass>(Nz::BasicMaterial::GetSettings());
-	matPass->EnableDepthBuffer(true);
-	{
-		std::string matPath;
-		playerMesh->GetMaterialData(0).GetStringParameter(Nz::MaterialData::BaseColorTexturePath, &matPath);
-
-		Nz::TextureParams texParams;
-		texParams.renderDevice = Nz::Graphics::Instance()->GetRenderDevice();
-
-		std::shared_ptr<Nz::Texture> texture = Nz::Texture::LoadFromFile(Nz::Utf8Path(matPath), texParams);
-
-		Nz::BasicMaterial basicMat(*matPass);
-		basicMat.SetBaseColorMap(texture);
-	}
-
-	std::shared_ptr<Nz::Material> mat = std::make_shared<Nz::Material>();
-	mat->AddPass("ForwardPass", matPass);
-
-	playerModel->SetMaterial(0, mat);
+	playerModel->SetMaterial(0, LoadMaterialFromPath(matPath));
 }

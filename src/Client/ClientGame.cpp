@@ -29,6 +29,20 @@ ClientGame::ClientGame(const Nz::IpAddress& serverAddress)
 	SetupPlayerEntity();
 }
 
+void ClientGame::OnTick(bool lastTick)
+{
+	PlayerInputs inputs = m_player.PollInputs();
+
+	Nz::NetPacket packet;
+
+	Nz::UInt16 netCode = 2;
+	packet << netCode;
+	packet << inputs.moveDown << inputs.moveLeft << inputs.moveRight << inputs.moveUp << inputs.placeBomb;
+	packet.FlushBits();
+
+	m_serverPeer->Send(0, Nz::ENetPacketFlag_Reliable, std::move(packet));
+}
+
 bool ClientGame::OnUpdate(float elapsedTime)
 {
 	if (!m_window->IsOpen())
@@ -62,7 +76,6 @@ bool ClientGame::OnUpdate(float elapsedTime)
 				case Nz::ENetEventType::Receive:
 				{
 					assert(event.peer == m_serverPeer);
-					std::cout << "Received data from server" << std::endl;
 
 					Nz::NetPacket& netPacket = event.packet->data;
 
@@ -86,7 +99,30 @@ bool ClientGame::OnUpdate(float elapsedTime)
 								m_map->UpdateCell(x, y, static_cast<Map::CellType>(cellType));
 							}
 						}
+					}
+					else if (netCode == 3)
+					{
+						Nz::UInt8 playerCount;
+						netPacket >> playerCount;
 
+						for (std::size_t i = 0; i < playerCount; ++i)
+						{
+							Nz::UInt8 playerIndex;
+							netPacket >> playerIndex;
+
+							Nz::Vector2f playerPos;
+							netPacket >> playerPos;
+
+							auto& playerNode = GetRegistry().get<Nz::NodeComponent>(m_debugPlayerEntity);
+							playerNode.SetPosition({ playerPos.x, 0.f, playerPos.y });
+						}
+					}
+					else if (netCode == 5)
+					{
+						Nz::Vector3f bombPos;
+						netPacket >> bombPos;
+
+						CreateBomb(bombPos);
 					}
 					break;
 				}
@@ -97,27 +133,8 @@ bool ClientGame::OnUpdate(float elapsedTime)
 
 	m_window->ProcessEvents();
 
-	auto& playerNode = GetRegistry().get<Nz::NodeComponent>(m_debugPlayerEntity);
-
-	constexpr float playerSpeed = 1.f;
-
-	PlayerInputs inputs = m_player.PollInputs();
-	if (inputs.moveDown)
-		playerNode.Move(Nz::Vector3f::Backward() * elapsedTime * playerSpeed, Nz::CoordSys::Global);
-
-	if (inputs.moveLeft)
-		playerNode.Move(Nz::Vector3f::Left() * elapsedTime * playerSpeed, Nz::CoordSys::Global);
-
-	if (inputs.moveRight)
-		playerNode.Move(Nz::Vector3f::Right() * elapsedTime * playerSpeed, Nz::CoordSys::Global);
-
-	if (inputs.moveUp)
-		playerNode.Move(Nz::Vector3f::Forward() * elapsedTime * playerSpeed, Nz::CoordSys::Global);
-
-	Nz::Vector3f playerPos = playerNode.GetPosition();
-
-	auto& renderSystem = GetSystemGraph().GetSystem<Nz::RenderSystem>();
-	renderSystem.GetFramePipeline().GetDebugDrawer().DrawLine(playerPos, playerPos + Nz::Vector3f::Up(), Nz::Color::Blue);
+	//auto& renderSystem = GetSystemGraph().GetSystem<Nz::RenderSystem>();
+	//renderSystem.GetFramePipeline().GetDebugDrawer().DrawLine(playerPos, playerPos + Nz::Vector3f::Up(), Nz::Color::Blue);
 
 	constexpr float cameraSpeed = 5.f;
 
@@ -146,6 +163,16 @@ bool ClientGame::OnUpdate(float elapsedTime)
 void ClientGame::OnUpsUpdate(unsigned int ups)
 {
 	m_window->SetTitle("Bomberman - " + std::to_string(ups) + " FPS");
+}
+
+void ClientGame::CreateBomb(const Nz::Vector3f& position)
+{
+	entt::entity bombEntity = GetRegistry().create();
+	auto& bombNode = GetRegistry().emplace<Nz::NodeComponent>(bombEntity);
+	bombNode.SetPosition(position);
+
+	auto& bombGfx = GetRegistry().emplace<Nz::GraphicsComponent>(bombEntity);
+	bombGfx.AttachRenderable(m_resources.bombModel, 0xFFFFFFFF);
 }
 
 void ClientGame::SetupCamera()
@@ -184,8 +211,6 @@ void ClientGame::SetupPlayerEntity()
 
 	auto& playerGfx = GetRegistry().emplace<Nz::GraphicsComponent>(m_debugPlayerEntity);
 	playerGfx.AttachRenderable(m_resources.playerModel, 0xFFFFFFFF);
-
-	m_map->ClearCell(0, 0);
 }
 
 void ClientGame::WaitUntilConnected()

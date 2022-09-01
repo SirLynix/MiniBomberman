@@ -14,7 +14,7 @@ ServerMap::ServerMap()
 	}
 }
 
-auto ServerMap::GetCell(std::size_t x, std::size_t y) const -> CellType
+auto ServerMap::GetCellContent(std::size_t x, std::size_t y) const -> CellType
 {
 	assert(x < Width);
 	assert(y < Height);

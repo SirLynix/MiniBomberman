@@ -16,10 +16,16 @@ class ServerGame : public Game
 		ServerGame(ServerGame&&) = delete;
 		~ServerGame() = default;
 
+		void BroadcastPacket(Nz::ENetPacketRef packet);
+
+		Nz::ENetHost& GetENetHost(); //< TEMP
+		ServerMap& GetMap();
+
 		ServerGame& operator=(const ServerGame&) = delete;
 		ServerGame& operator=(ServerGame&&) = delete;
 
 	private:
+		void OnTick(bool lastTick) override;
 		bool OnUpdate(float elapsedTime) override;
 		void OnUpsUpdate(unsigned int ups) override;
 

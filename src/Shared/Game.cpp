@@ -1,4 +1,5 @@
 #include <Shared/Game.hpp>
+#include <Shared/Constants.hpp>
 #include <Nazara/Graphics/Components.hpp>
 #include <Nazara/Graphics/FramePipeline.hpp>
 #include <Nazara/Graphics/Systems.hpp>
@@ -6,6 +7,7 @@
 
 Game::Game() :
 m_systemGraph(m_registry),
+m_tickCounter(0.f),
 m_upsCounter(0)
 {
 }
@@ -18,8 +20,16 @@ int Game::Run()
 	Nz::Clock updateClock;
 	for (;;)
 	{
-		if (!OnUpdate(updateClock.Restart() / 1'000'000.f))
+		Nz::UInt64 elapsedTime = updateClock.Restart();
+		if (!OnUpdate(elapsedTime / 1'000'000.f))
 			break;
+
+		m_tickCounter += elapsedTime;
+		while (m_tickCounter >= TickDuration)
+		{
+			m_tickCounter -= TickDuration;
+			OnTick(m_tickCounter < TickDuration);
+		}
 
 		m_systemGraph.Update();
 

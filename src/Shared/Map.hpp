@@ -19,6 +19,7 @@ class Map
 
 		void ClearCell(std::size_t x, std::size_t y);
 
+		std::pair<std::size_t, std::size_t> GetCell(const Nz::Vector3f& position) const;
 		Nz::Vector3f GetCellCenter(std::size_t x, std::size_t y) const;
 
 		virtual void UpdateCell(std::size_t x, std::size_t y, CellType cellType) = 0;

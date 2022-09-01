@@ -21,11 +21,13 @@ class Game
 		entt::registry& GetRegistry();
 		Nz::SystemGraph& GetSystemGraph();
 
+		virtual void OnTick(bool lastTick) = 0;
 		virtual bool OnUpdate(float elapsedTime) = 0;
 		virtual void OnUpsUpdate(unsigned int ups) = 0;
 
 	private:
 		entt::registry m_registry;
 		Nz::SystemGraph m_systemGraph;
+		Nz::UInt64 m_tickCounter;
 		unsigned int m_upsCounter;
 };

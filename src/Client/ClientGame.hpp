@@ -24,9 +24,11 @@ class ClientGame : public Game
 		ClientGame& operator=(ClientGame&&) = delete;
 
 	private:
+		void OnTick(bool lastTick) override;
 		bool OnUpdate(float elapsedTime) override;
 		void OnUpsUpdate(unsigned int ups) override;
 		
+		void CreateBomb(const Nz::Vector3f& position);
 		void SetupCamera();
 		void SetupPlayerEntity();
 		void WaitUntilConnected();
