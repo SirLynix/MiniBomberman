@@ -20,6 +20,9 @@ class ClientGame : public Game
 		ClientGame(ClientGame&&) = delete;
 		~ClientGame() = default;
 
+		template<typename T> void SendPacket(const T& packet);
+		void SendPacket(Nz::UInt8 channelId, Nz::ENetPacketRef packet);
+
 		ClientGame& operator=(const ClientGame&) = delete;
 		ClientGame& operator=(ClientGame&&) = delete;
 
@@ -43,3 +46,5 @@ class ClientGame : public Game
 		std::unique_ptr<ClientMap> m_map;
 		ClientPlayer m_player;
 };
+
+#include <Client/ClientGame.inl>

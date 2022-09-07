@@ -1,4 +1,5 @@
 #include <Client/ClientGame.hpp>
+#include <Shared/NetCode.hpp>
 #include <Nazara/Graphics/Components.hpp>
 #include <Nazara/Graphics/FramePipeline.hpp>
 #include <Nazara/Graphics/Systems.hpp>
@@ -8,7 +9,7 @@
 
 ClientGame::ClientGame(const Nz::IpAddress& serverAddress)
 {
-	if (!m_networkHost.Create(Nz::NetProtocol::IPv6, 0, 1))
+	if (!m_networkHost.Create(Nz::NetProtocol::IPv6, 0, 1, 2))
 		throw std::runtime_error("failed to create network host");
 
 	// Connect to server
@@ -29,18 +30,19 @@ ClientGame::ClientGame(const Nz::IpAddress& serverAddress)
 	SetupPlayerEntity();
 }
 
+void ClientGame::SendPacket(Nz::UInt8 channelId, Nz::ENetPacketRef packet)
+{
+	m_serverPeer->Send(channelId, std::move(packet));
+}
+
 void ClientGame::OnTick(bool lastTick)
 {
 	PlayerInputs inputs = m_player.PollInputs();
 
-	Nz::NetPacket packet;
+	PlayerInputPacket inputPacket;
+	inputPacket.inputs = inputs;
 
-	Nz::UInt16 netCode = 2;
-	packet << netCode;
-	packet << inputs.moveDown << inputs.moveLeft << inputs.moveRight << inputs.moveUp << inputs.placeBomb;
-	packet.FlushBits();
-
-	m_serverPeer->Send(0, Nz::ENetPacketFlag_Reliable, std::move(packet));
+	SendPacket(inputPacket);
 }
 
 bool ClientGame::OnUpdate(float elapsedTime)
@@ -82,47 +84,36 @@ bool ClientGame::OnUpdate(float elapsedTime)
 					Nz::UInt16 netCode;
 					netPacket >> netCode;
 
-					if (netCode == 1)
+					PacketOpcode opcode = Nz::SafeCast<PacketOpcode>(netCode);
+
+					if (opcode == PacketOpcode::S_InitialData)
 					{
+						InitialDataPacket initialData = InitialDataPacket::Unserialize(netPacket);
+
 						std::cout << "Received map" << std::endl;
 
-						Nz::UInt8 width, height;
-						netPacket >> width >> height;
-
-						for (std::size_t y = 0; y < height; ++y)
+						for (std::size_t y = 0; y < initialData.mapHeight; ++y)
 						{
-							for (std::size_t x = 0; x < width; ++x)
+							for (std::size_t x = 0; x < initialData.mapWidth; ++x)
 							{
-								Nz::UInt8 cellType;
-								netPacket >> cellType;
-
-								m_map->UpdateCell(x, y, static_cast<Map::CellType>(cellType));
+								m_map->UpdateCell(x, y, initialData.mapCells[y * initialData.mapWidth + x]);
 							}
 						}
 					}
-					else if (netCode == 3)
+					else if (opcode == PacketOpcode::S_PlayerPositions)
 					{
-						Nz::UInt8 playerCount;
-						netPacket >> playerCount;
-
-						for (std::size_t i = 0; i < playerCount; ++i)
+						PlayerPositionsPacket playerPositions = PlayerPositionsPacket::Unserialize(netPacket);
+						for (const auto& playerData : playerPositions.playerPos)
 						{
-							Nz::UInt8 playerIndex;
-							netPacket >> playerIndex;
-
-							Nz::Vector2f playerPos;
-							netPacket >> playerPos;
-
 							auto& playerNode = GetRegistry().get<Nz::NodeComponent>(m_debugPlayerEntity);
-							playerNode.SetPosition({ playerPos.x, 0.f, playerPos.y });
+							playerNode.SetPosition({ playerData.position.x, 0.f, playerData.position.y });
 						}
 					}
-					else if (netCode == 5)
+					else if (opcode == PacketOpcode::S_BombSpawn)
 					{
-						Nz::Vector3f bombPos;
-						netPacket >> bombPos;
+						BombSpawnPacket bombSpawn = BombSpawnPacket::Unserialize(netPacket);
 
-						CreateBomb(bombPos);
+						CreateBomb(bombSpawn.position);
 					}
 					break;
 				}

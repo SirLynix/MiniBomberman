@@ -1,5 +1,6 @@
 
 #include <Server/ServerPlayer.hpp>
+#include <Shared/NetCode.hpp>
 #include <Server/ServerGame.hpp>
 #include <iostream>
 
@@ -35,16 +36,15 @@ void ServerPlayer::HandlePlaceBomb()
 
 	std::cout << "Le joueur #" << m_index << " pose une bombe sur la cellule " << cellX << ", " << cellY << "!" << std::endl;
 
-	Nz::Vector3f bombPos = m_game.GetMap().GetCellCenter(cellX, cellY);
+	BombSpawnPacket bombSpawn;
+	bombSpawn.position = m_game.GetMap().GetCellCenter(cellX, cellY);
 
-	Nz::ENetPacketRef enetPacket = m_game.GetENetHost().AllocatePacket(Nz::ENetPacketFlag_Reliable);
-	Nz::NetPacket& packet = enetPacket->data;
+	m_game.BroadcastPacket(bombSpawn);
+}
 
-	Nz::UInt16 netCode = 5;
-	packet << netCode;
-	packet << bombPos;
-
-	m_game.BroadcastPacket(enetPacket);
+void ServerPlayer::SendPacket(Nz::UInt8 channelId, Nz::ENetPacketRef packet)
+{
+	m_peer->Send(channelId, std::move(packet));
 }
 
 void ServerPlayer::UpdateInputs(const PlayerInputs& inputs)

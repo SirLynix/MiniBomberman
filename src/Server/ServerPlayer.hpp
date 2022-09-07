@@ -22,6 +22,9 @@ class ServerPlayer : public Player
 
 		void HandlePlaceBomb();
 
+		void SendPacket(Nz::UInt8 channelId, Nz::ENetPacketRef packet);
+		template<typename T> void SendPacket(const T& packet);
+
 		void UpdateInputs(const PlayerInputs& inputs);
 		void UpdatePosition(const Nz::Vector2f& position);
 
@@ -37,3 +40,5 @@ class ServerPlayer : public Player
 		ServerGame& m_game;
 		PlayerInputs m_lastInputs;
 };
+
+#include <Server/ServerPlayer.inl>

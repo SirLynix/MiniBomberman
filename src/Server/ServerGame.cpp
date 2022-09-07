@@ -1,5 +1,6 @@
 #include <Server/ServerGame.hpp>
 #include <Shared/Constants.hpp>
+#include <Shared/NetCode.hpp>
 #include <Shared/PlayerInputs.hpp>
 #include <Nazara/Utils/Algorithm.hpp>
 #include <iostream>
@@ -8,21 +9,16 @@
 ServerGame::ServerGame() :
 m_playerPool(64)
 {
-	if (!m_networkHost.Create(Nz::NetProtocol::Any, 14642, 64))
+	if (!m_networkHost.Create(Nz::NetProtocol::Any, 14642, 64, 2))
 		throw std::runtime_error("failed to create host");
 
 	m_map = std::make_unique<ServerMap>();
 }
 
-void ServerGame::BroadcastPacket(Nz::ENetPacketRef packet)
+void ServerGame::BroadcastPacket(Nz::UInt8 channelId, Nz::ENetPacketRef packet)
 {
 	for (ServerPlayer& player : m_playerPool)
-		player.GetPeer()->Send(0, packet);
-}
-
-Nz::ENetHost& ServerGame::GetENetHost()
-{
-	return m_networkHost;
+		player.GetPeer()->Send(channelId, packet);
 }
 
 ServerMap& ServerGame::GetMap()
@@ -63,26 +59,16 @@ void ServerGame::OnTick(bool lastTick)
 		player.UpdatePosition(playerPos);
 	}
 
-
-	Nz::ENetPacketRef enetPacket = m_networkHost.AllocatePacket(Nz::ENetPacketFlag_Reliable);
-	Nz::NetPacket& packet = enetPacket->data;
-
-	Nz::UInt16 netCode = 3;
-	packet << netCode;
-
-	Nz::UInt8 playerCount = Nz::SafeCast<Nz::UInt8>(m_playerPool.size());
-	packet << playerCount;
-
+	PlayerPositionsPacket playerPositions;
+	playerPositions.playerPos.reserve(m_playerPool.size());
 	for (ServerPlayer& player : m_playerPool)
 	{
-		Nz::UInt8 playerIndex = Nz::SafeCast<Nz::UInt8>(player.GetIndex());
-		packet << playerIndex;
-
-		Nz::Vector2f playerPos = player.GetPosition();
-		packet << playerPos;
+		auto& playerPos = playerPositions.playerPos.emplace_back();
+		playerPos.playerIndex = Nz::SafeCast<Nz::UInt8>(player.GetIndex());
+		playerPos.position = player.GetPosition();
 	}
 
-	BroadcastPacket(enetPacket);
+	BroadcastPacket(playerPositions);
 }
 
 bool ServerGame::OnUpdate(float elapsedTime)
@@ -126,18 +112,17 @@ bool ServerGame::OnUpdate(float elapsedTime)
 
 				std::cout << "A new player logged in (player #" << playerIndex << ")" << std::endl;
 
-				Nz::NetPacket packet;
-
-				Nz::UInt16 netCode = 1;
-				packet << netCode;
-				packet << Nz::SafeCast<Nz::UInt8>(ServerMap::Width) << Nz::SafeCast<Nz::UInt8>(ServerMap::Height);
+				InitialDataPacket initialData;
+				initialData.mapWidth = Nz::SafeCast<Nz::UInt8>(ServerMap::Width);
+				initialData.mapHeight = Nz::SafeCast<Nz::UInt8>(ServerMap::Height);
+				initialData.mapCells.reserve(ServerMap::Width * ServerMap::Height);
 				for (std::size_t y = 0; y < ServerMap::Height; ++y)
 				{
 					for (std::size_t x = 0; x < ServerMap::Width; ++x)
-						packet << Nz::SafeCast<Nz::UInt8>(m_map->GetCellContent(x, y));
+						initialData.mapCells.push_back(m_map->GetCellContent(x, y));
 				}
 
-				event.peer->Send(0, Nz::ENetPacketFlag_Reliable, std::move(packet));
+				player->SendPacket(initialData);
 				break;
 			}
 
@@ -148,6 +133,7 @@ bool ServerGame::OnUpdate(float elapsedTime)
 
 				ServerPlayer* serverPlayer = m_playerPool.RetrieveFromIndex(playerIndex);
 				
+				// TODO: Refactor
 				Nz::NetPacket& packet = event.packet->data;
 
 				Nz::UInt16 netCode;
@@ -155,7 +141,7 @@ bool ServerGame::OnUpdate(float elapsedTime)
 
 				switch (netCode)
 				{
-					case 2:
+					case 0:
 					{
 						// player inputs
 						PlayerInputs inputs;
