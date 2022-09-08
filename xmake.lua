@@ -1,5 +1,6 @@
 add_rules("mode.debug", "mode.release")
 add_repositories("nazara-repo https://github.com/NazaraEngine/xmake-repo.git")
+add_requires("fmt")
 add_requires("nazaraengine~client", { debug = is_mode("debug"), configs = { physics2d = false } })
 add_requires("nazaraengine~server", { debug = is_mode("debug"), configs = { 
     audio = false, 
@@ -11,11 +12,13 @@ add_requires("nazaraengine~server", { debug = is_mode("debug"), configs = {
 
 set_project("Bomberman")
 
+add_packages("fmt")
 set_languages("c++17")
 add_includedirs("src")
 set_rundir("bin")
 set_targetdir("bin/$(plat)_$(arch)_$(mode)")
 set_runtimes(is_mode("debug") and "MDd" or "MD")
+set_warnings("allextra")
 
 target("Bomberman")
     set_kind("binary")

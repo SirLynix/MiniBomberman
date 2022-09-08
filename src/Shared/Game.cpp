@@ -7,7 +7,7 @@
 
 Game::Game() :
 m_systemGraph(m_registry),
-m_tickCounter(0.f),
+m_tickCounter(0),
 m_upsCounter(0)
 {
 }

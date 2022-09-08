@@ -9,6 +9,7 @@
 #include <Client/ClientPlayer.hpp>
 #include <Client/ClientResources.hpp>
 #include <Shared/Game.hpp>
+#include <Shared/NetCode.hpp>
 #include <entt/entt.hpp>
 #include <memory>
 
@@ -32,18 +33,25 @@ class ClientGame : public Game
 		void OnUpsUpdate(unsigned int ups) override;
 		
 		void CreateBomb(const Nz::Vector3f& position);
+		void CreatePlayer(NetCode::PlayerInfo&& netPlayerInfo);
+		void DestroyPlayer(Nz::UInt8 playerIndex);
 		void SetupCamera();
-		void SetupPlayerEntity();
 		void WaitUntilConnected();
 
+		struct PlayerInfo
+		{
+			entt::entity playerEntity;
+			std::string name;
+		};
+
 		entt::entity m_cameraEntity;
-		entt::entity m_debugPlayerEntity;
 		Nz::ENetHost m_networkHost;
 		Nz::ENetPeer* m_serverPeer;
 		Nz::EulerAnglesf m_cameraRotation;
 		Nz::RenderWindow* m_window;
 		ClientResources m_resources;
 		std::unique_ptr<ClientMap> m_map;
+		std::vector<std::optional<PlayerInfo>> m_playerInfo;
 		ClientPlayer m_player;
 };
 

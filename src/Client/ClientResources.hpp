@@ -5,7 +5,7 @@
 #include <filesystem>
 #include <memory>
 
-struct ClientResources
+class ClientResources
 {
 	public:
 		ClientResources();

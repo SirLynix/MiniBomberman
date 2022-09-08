@@ -3,7 +3,7 @@
 #include <Shared/NetCode.hpp>
 #include <Shared/PlayerInputs.hpp>
 #include <Nazara/Utils/Algorithm.hpp>
-#include <iostream>
+#include <fmt/core.h>
 #include <stdexcept>
 
 ServerGame::ServerGame() :
@@ -15,10 +15,13 @@ m_playerPool(64)
 	m_map = std::make_unique<ServerMap>();
 }
 
-void ServerGame::BroadcastPacket(Nz::UInt8 channelId, Nz::ENetPacketRef packet)
+void ServerGame::BroadcastPacket(Nz::UInt8 channelId, Nz::ENetPacketRef packet, ServerPlayer* except)
 {
 	for (ServerPlayer& player : m_playerPool)
-		player.GetPeer()->Send(channelId, packet);
+	{
+		if (&player != except)
+			player.GetPeer()->Send(channelId, packet);
+	}
 }
 
 ServerMap& ServerGame::GetMap()
@@ -26,7 +29,7 @@ ServerMap& ServerGame::GetMap()
 	return *m_map;
 }
 
-void ServerGame::OnTick(bool lastTick)
+void ServerGame::OnTick(bool /*lastTick*/)
 {
 	for (ServerPlayer& player : m_playerPool)
 	{
@@ -35,31 +38,31 @@ void ServerGame::OnTick(bool lastTick)
 		constexpr float playerSpeed = 5.f;
 		constexpr float elapsedTime = TickDuration / 1'000'000.f;
 
-		Nz::Vector2f playerPos = player.GetPosition();
-		Nz::Vector2f playerDir = Nz::Vector2f::Zero();
+		Nz::Vector3f playerPos = player.GetPosition();
+		Nz::Vector3f playerDir = Nz::Vector3f::Zero();
 
 		if (lastInputs.moveDown)
-			playerDir += Nz::Vector2f(0.f, 1.f);
+			playerDir += Nz::Vector3f::Backward();
 
 		if (lastInputs.moveUp)
-			playerDir += Nz::Vector2f(0.f, -1.f);
+			playerDir += Nz::Vector3f::Forward();
 
 		if (lastInputs.moveLeft)
-			playerDir += Nz::Vector2f(1.f, 0.f);
+			playerDir += Nz::Vector3f::Left();
 
 		if (lastInputs.moveRight)
-			playerDir += Nz::Vector2f(-1.f, 0.f);
+			playerDir += Nz::Vector3f::Right();
 
-		if (playerDir != Nz::Vector2f::Zero())
+		if (playerDir != Nz::Vector3f::Zero())
 			playerPos += playerDir.GetNormal() * elapsedTime * playerSpeed;
 
-		if (lastInputs.placeBomb)		
+		if (lastInputs.placeBomb)
 			player.HandlePlaceBomb();
 
 		player.UpdatePosition(playerPos);
 	}
 
-	PlayerPositionsPacket playerPositions;
+	NetCode::PlayerPositionsPacket playerPositions;
 	playerPositions.playerPos.reserve(m_playerPool.size());
 	for (ServerPlayer& player : m_playerPool)
 	{
@@ -71,7 +74,7 @@ void ServerGame::OnTick(bool lastTick)
 	BroadcastPacket(playerPositions);
 }
 
-bool ServerGame::OnUpdate(float elapsedTime)
+bool ServerGame::OnUpdate(float /*elapsedTime*/)
 {
 	m_networkHost.Service(nullptr, 0);
 
@@ -89,17 +92,24 @@ bool ServerGame::OnUpdate(float elapsedTime)
 				auto it = m_peerIdToPlayerIndex.find(event.peer->GetPeerId());
 				assert(it != m_peerIdToPlayerIndex.end());
 
-				std::cout << "Player #" << it->second << " disconnected" << std::endl;
+				std::size_t playerIndex = it->second;
 
-				m_playerPool.Free(it->second);
+				fmt::print("Player #{} disconnected\n", playerIndex);
+
+				m_playerPool.Free(playerIndex);
 				m_peerIdToPlayerIndex.erase(it);
+
+				NetCode::PlayerDisconnectedPacket disconnectedPacket;
+				disconnectedPacket.playerIndex = Nz::SafeCast<Nz::UInt8>(playerIndex);
+
+				BroadcastPacket(disconnectedPacket);
 				break;
 			}
 
 			case Nz::ENetEventType::IncomingConnect:
 			{
 				std::size_t playerIndex;
-				ServerPlayer* player = m_playerPool.Allocate(playerIndex, *this, event.peer);
+				ServerPlayer* player = m_playerPool.Allocate(playerIndex, *this, event.peer, "Mingebag");
 				player->UpdateIndex(playerIndex);
 
 				m_peerIdToPlayerIndex[event.peer->GetPeerId()] = playerIndex;
@@ -108,11 +118,11 @@ bool ServerGame::OnUpdate(float elapsedTime)
 				std::size_t cellY = std::rand() % ServerMap::Height;
 				m_map->ClearCell(cellX, cellY);
 				Nz::Vector3f cellCenter = m_map->GetCellCenter(cellX, cellY);
-				player->UpdatePosition({ cellCenter.x, cellCenter.z });
+				player->UpdatePosition(cellCenter);
 
-				std::cout << "A new player logged in (player #" << playerIndex << ")" << std::endl;
+				fmt::print("A new player logged in (player #{})\n", playerIndex);
 
-				InitialDataPacket initialData;
+				NetCode::InitialDataPacket initialData;
 				initialData.mapWidth = Nz::SafeCast<Nz::UInt8>(ServerMap::Width);
 				initialData.mapHeight = Nz::SafeCast<Nz::UInt8>(ServerMap::Height);
 				initialData.mapCells.reserve(ServerMap::Width * ServerMap::Height);
@@ -122,7 +132,23 @@ bool ServerGame::OnUpdate(float elapsedTime)
 						initialData.mapCells.push_back(m_map->GetCellContent(x, y));
 				}
 
+				initialData.playerIndex = Nz::SafeCast<Nz::UInt8>(playerIndex);
+				for (const ServerPlayer& serverPlayer : m_playerPool)
+				{
+					auto& playerInfo = initialData.players.emplace_back();
+					playerInfo.index = Nz::SafeCast<Nz::UInt8>(serverPlayer.GetIndex());
+					playerInfo.name  = serverPlayer.GetName();
+					playerInfo.position = serverPlayer.GetPosition();
+				}
+
 				player->SendPacket(initialData);
+
+				NetCode::PlayerConnectedPacket connectedPacket;
+				connectedPacket.playerInfo.index = Nz::SafeCast<Nz::UInt8>(playerIndex);
+				connectedPacket.playerInfo.name = player->GetName();
+				connectedPacket.playerInfo.position = player->GetPosition();
+
+				BroadcastPacket(connectedPacket, player);
 				break;
 			}
 
@@ -133,23 +159,25 @@ bool ServerGame::OnUpdate(float elapsedTime)
 
 				ServerPlayer* serverPlayer = m_playerPool.RetrieveFromIndex(playerIndex);
 				
-				// TODO: Refactor
-				Nz::NetPacket& packet = event.packet->data;
+				Nz::NetPacket& netPacket = event.packet->data;
 
 				Nz::UInt16 netCode;
-				packet >> netCode;
+				netPacket >> netCode;
 
-				switch (netCode)
+				NetCode::Opcode opcode = Nz::SafeCast<NetCode::Opcode>(netCode);
+
+				switch (opcode)
 				{
-					case 0:
+					case NetCode::Opcode::C_PlayerInput:
 					{
-						// player inputs
-						PlayerInputs inputs;
-						packet >> inputs.moveDown >> inputs.moveLeft >> inputs.moveRight >> inputs.moveUp >> inputs.placeBomb;
+						NetCode::PlayerInputPacket inputPacket = NetCode::PlayerInputPacket::Unserialize(netPacket);
 
-						serverPlayer->UpdateInputs(inputs);
+						serverPlayer->UpdateInputs(inputPacket.inputs);
 						break;
 					}
+
+					default:
+						fmt::print(stderr, "unhandled packet opcode {}\n", netCode);
 				}
 				break;
 			}
@@ -161,5 +189,5 @@ bool ServerGame::OnUpdate(float elapsedTime)
 
 void ServerGame::OnUpsUpdate(unsigned int ups)
 {
-	std::cout << ups << " ups" << std::endl;
+	fmt::print("{} ups\n", ups);
 }

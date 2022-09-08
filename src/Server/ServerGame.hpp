@@ -15,8 +15,8 @@ class ServerGame : public Game
 		ServerGame(ServerGame&&) = delete;
 		~ServerGame() = default;
 
-		template<typename T> void BroadcastPacket(const T& packet);
-		void BroadcastPacket(Nz::UInt8 channelId, Nz::ENetPacketRef packet);
+		template<typename T> void BroadcastPacket(const T& packet, ServerPlayer* except = nullptr);
+		void BroadcastPacket(Nz::UInt8 channelId, Nz::ENetPacketRef packet, ServerPlayer* except = nullptr);
 
 		ServerMap& GetMap();
 

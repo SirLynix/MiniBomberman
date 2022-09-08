@@ -5,7 +5,7 @@
 #include <Server/ServerGame.hpp>
 #include <iostream>
 
-int main(int argc, char** argv)
+int main()
 {
 	Nz::Modules<Nz::Network> nazara;
 

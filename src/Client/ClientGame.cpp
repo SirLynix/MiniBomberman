@@ -4,7 +4,7 @@
 #include <Nazara/Graphics/FramePipeline.hpp>
 #include <Nazara/Graphics/Systems.hpp>
 #include <Nazara/Utility/Components.hpp>
-#include <iostream>
+#include <fmt/core.h>
 #include <stdexcept>
 
 ClientGame::ClientGame(const Nz::IpAddress& serverAddress)
@@ -26,8 +26,6 @@ ClientGame::ClientGame(const Nz::IpAddress& serverAddress)
 	SetupCamera();
 
 	m_map = std::make_unique<ClientMap>(GetRegistry(), m_resources);
-
-	SetupPlayerEntity();
 }
 
 void ClientGame::SendPacket(Nz::UInt8 channelId, Nz::ENetPacketRef packet)
@@ -35,11 +33,11 @@ void ClientGame::SendPacket(Nz::UInt8 channelId, Nz::ENetPacketRef packet)
 	m_serverPeer->Send(channelId, std::move(packet));
 }
 
-void ClientGame::OnTick(bool lastTick)
+void ClientGame::OnTick(bool /*lastTick*/)
 {
 	PlayerInputs inputs = m_player.PollInputs();
 
-	PlayerInputPacket inputPacket;
+	NetCode::PlayerInputPacket inputPacket;
 	inputPacket.inputs = inputs;
 
 	SendPacket(inputPacket);
@@ -64,14 +62,14 @@ bool ClientGame::OnUpdate(float elapsedTime)
 				case Nz::ENetEventType::Disconnect:
 				{
 					assert(event.peer == m_serverPeer);
-					std::cout << "Disconnected from server" << std::endl;
+					fmt::print("Disconnected from server\n");
 					break;
 				}
 
 				case Nz::ENetEventType::OutgoingConnect:
 				{
+					fmt::print("unexpected event\n");
 					assert(event.peer == m_serverPeer);
-					std::cout << "Connected to server" << std::endl;
 					break;
 				}
 
@@ -84,36 +82,69 @@ bool ClientGame::OnUpdate(float elapsedTime)
 					Nz::UInt16 netCode;
 					netPacket >> netCode;
 
-					PacketOpcode opcode = Nz::SafeCast<PacketOpcode>(netCode);
+					NetCode::Opcode opcode = Nz::SafeCast<NetCode::Opcode>(netCode);
 
-					if (opcode == PacketOpcode::S_InitialData)
+					switch (opcode)
 					{
-						InitialDataPacket initialData = InitialDataPacket::Unserialize(netPacket);
-
-						std::cout << "Received map" << std::endl;
-
-						for (std::size_t y = 0; y < initialData.mapHeight; ++y)
+						case NetCode::Opcode::S_BombSpawn:
 						{
-							for (std::size_t x = 0; x < initialData.mapWidth; ++x)
+							NetCode::BombSpawnPacket bombSpawn = NetCode::BombSpawnPacket::Unserialize(netPacket);
+
+							CreateBomb(bombSpawn.position);
+							break;
+						}
+
+						case NetCode::Opcode::S_InitialData:
+						{
+							NetCode::InitialDataPacket initialData = NetCode::InitialDataPacket::Unserialize(netPacket);
+
+							for (std::size_t y = 0; y < initialData.mapHeight; ++y)
 							{
-								m_map->UpdateCell(x, y, initialData.mapCells[y * initialData.mapWidth + x]);
+								for (std::size_t x = 0; x < initialData.mapWidth; ++x)
+								{
+									m_map->UpdateCell(x, y, initialData.mapCells[y * initialData.mapWidth + x]);
+								}
 							}
-						}
-					}
-					else if (opcode == PacketOpcode::S_PlayerPositions)
-					{
-						PlayerPositionsPacket playerPositions = PlayerPositionsPacket::Unserialize(netPacket);
-						for (const auto& playerData : playerPositions.playerPos)
-						{
-							auto& playerNode = GetRegistry().get<Nz::NodeComponent>(m_debugPlayerEntity);
-							playerNode.SetPosition({ playerData.position.x, 0.f, playerData.position.y });
-						}
-					}
-					else if (opcode == PacketOpcode::S_BombSpawn)
-					{
-						BombSpawnPacket bombSpawn = BombSpawnPacket::Unserialize(netPacket);
 
-						CreateBomb(bombSpawn.position);
+							for (auto&& playerInfo : initialData.players)
+								CreatePlayer(std::move(playerInfo));
+
+							break;
+						}
+
+						case NetCode::Opcode::S_PlayerConnected:
+						{
+							NetCode::PlayerConnectedPacket initialData = NetCode::PlayerConnectedPacket::Unserialize(netPacket);
+							CreatePlayer(std::move(initialData.playerInfo));
+							break;
+						}
+
+						case NetCode::Opcode::S_PlayerDisconnected:
+						{
+							NetCode::PlayerDisconnectedPacket initialData = NetCode::PlayerDisconnectedPacket::Unserialize(netPacket);
+							DestroyPlayer(initialData.playerIndex);
+							break;
+						}
+
+						case NetCode::Opcode::S_PlayerPositions:
+						{
+							NetCode::PlayerPositionsPacket playerPositions = NetCode::PlayerPositionsPacket::Unserialize(netPacket);
+							for (const auto& playerData : playerPositions.playerPos)
+							{
+								assert(playerData.playerIndex < m_playerInfo.size());
+								assert(m_playerInfo[playerData.playerIndex].has_value());
+
+								auto& playerInfo = *m_playerInfo[playerData.playerIndex];
+
+								auto& playerNode = GetRegistry().get<Nz::NodeComponent>(playerInfo.playerEntity);
+								playerNode.SetPosition(playerData.position);
+							}
+							break;
+						}
+
+						default:
+							fmt::print(stderr, "unhandled packet opcode {}\n", netCode);
+							break;
 					}
 					break;
 				}
@@ -166,6 +197,32 @@ void ClientGame::CreateBomb(const Nz::Vector3f& position)
 	bombGfx.AttachRenderable(m_resources.bombModel, 0xFFFFFFFF);
 }
 
+void ClientGame::CreatePlayer(NetCode::PlayerInfo&& netPlayerInfo)
+{
+	if (m_playerInfo.size() <= netPlayerInfo.index)
+		m_playerInfo.resize(netPlayerInfo.index + 1);
+
+	assert(!m_playerInfo[netPlayerInfo.index].has_value());
+	auto& playerInfo = m_playerInfo[netPlayerInfo.index].emplace();
+	playerInfo.name = std::move(netPlayerInfo.name);
+
+	playerInfo.playerEntity = GetRegistry().create();
+	auto& playerNode = GetRegistry().emplace<Nz::NodeComponent>(playerInfo.playerEntity);
+	playerNode.SetPosition(netPlayerInfo.position);
+
+	auto& playerGfx = GetRegistry().emplace<Nz::GraphicsComponent>(playerInfo.playerEntity);
+	playerGfx.AttachRenderable(m_resources.playerModel, 0xFFFFFFFF);
+}
+
+void ClientGame::DestroyPlayer(Nz::UInt8 playerIndex)
+{
+	assert(playerIndex < m_playerInfo.size());
+	assert(m_playerInfo[playerIndex].has_value());
+
+	auto& playerInfo = *m_playerInfo[playerIndex];
+	GetRegistry().destroy(playerInfo.playerEntity);
+}
+
 void ClientGame::SetupCamera()
 {
 	m_cameraRotation = Nz::EulerAnglesf(-90.f, 0.f, 0.f);
@@ -192,18 +249,6 @@ void ClientGame::SetupCamera()
 	});
 }
 
-void ClientGame::SetupPlayerEntity()
-{
-	Nz::Vector3f playerPosition = m_map->GetCellCenter(0, 0);
-
-	m_debugPlayerEntity = GetRegistry().create();
-	auto& playerNode = GetRegistry().emplace<Nz::NodeComponent>(m_debugPlayerEntity);
-	playerNode.SetPosition(playerPosition);
-
-	auto& playerGfx = GetRegistry().emplace<Nz::GraphicsComponent>(m_debugPlayerEntity);
-	playerGfx.AttachRenderable(m_resources.playerModel, 0xFFFFFFFF);
-}
-
 void ClientGame::WaitUntilConnected()
 {
 	Nz::Clock timeoutClock;
@@ -219,7 +264,7 @@ void ClientGame::WaitUntilConnected()
 					case Nz::ENetEventType::OutgoingConnect:
 					{
 						assert(event.peer == m_serverPeer);
-						std::cout << "Connected to server" << std::endl;
+						fmt::print("Connected to server\n");
 						return;
 					}
 				}

@@ -1,20 +1,30 @@
 
 #include <Shared/NetCode.hpp>
 
-void BombSpawnPacket::Serialize(Nz::ByteStream& stream) const
+void NetCode::PlayerInfo::Serialize(Nz::ByteStream& stream) const
+{
+	stream << index << name << position;
+}
+
+void NetCode::PlayerInfo::Unserialize(Nz::ByteStream& stream)
+{
+	stream >> index >> name >> position;
+}
+
+void NetCode::BombSpawnPacket::Serialize(Nz::ByteStream& stream) const
 {
 	stream << position;
 }
 
-BombSpawnPacket BombSpawnPacket::Unserialize(Nz::ByteStream& stream)
+NetCode::BombSpawnPacket NetCode::BombSpawnPacket::Unserialize(Nz::ByteStream& stream)
 {
-	BombSpawnPacket packet;
+	NetCode::BombSpawnPacket packet;
 	stream >> packet.position;
 
 	return packet;
 }
 
-void InitialDataPacket::Serialize(Nz::ByteStream& stream) const
+void NetCode::InitialDataPacket::Serialize(Nz::ByteStream& stream) const
 {
 	stream << mapWidth << mapHeight;
 
@@ -24,11 +34,19 @@ void InitialDataPacket::Serialize(Nz::ByteStream& stream) const
 		Nz::UInt8 typeIndex = Nz::SafeCast<Nz::UInt8>(cellType);
 		stream << typeIndex;
 	}
+
+	stream << playerIndex;
+
+	Nz::UInt8 playerCount = Nz::SafeCast<Nz::UInt8>(players.size());
+	stream << playerCount;
+
+	for (const auto& playerInfo : players)
+		playerInfo.Serialize(stream);
 }
 
-InitialDataPacket InitialDataPacket::Unserialize(Nz::ByteStream& stream)
+NetCode::InitialDataPacket NetCode::InitialDataPacket::Unserialize(Nz::ByteStream& stream)
 {
-	InitialDataPacket packet;
+	NetCode::InitialDataPacket packet;
 	stream >> packet.mapWidth >> packet.mapHeight;
 
 	packet.mapCells.resize(packet.mapWidth * packet.mapHeight);
@@ -40,23 +58,59 @@ InitialDataPacket InitialDataPacket::Unserialize(Nz::ByteStream& stream)
 		cellType = Nz::SafeCast<Map::CellType>(typeIndex);
 	}
 
+	Nz::UInt8 playerIndex;
+	stream >> playerIndex;
+
+	Nz::UInt8 playerCount;
+	stream >> playerCount;
+
+	packet.players.resize(playerCount);
+	for (auto& playerInfo : packet.players)
+		playerInfo.Unserialize(stream);
+
 	return packet;
 }
 
-void PlayerInputPacket::Serialize(Nz::ByteStream& stream) const
+void NetCode::PlayerConnectedPacket::Serialize(Nz::ByteStream& stream) const
+{
+	playerInfo.Serialize(stream);
+}
+
+NetCode::PlayerConnectedPacket NetCode::PlayerConnectedPacket::Unserialize(Nz::ByteStream& stream)
+{
+	NetCode::PlayerConnectedPacket packet;
+	packet.playerInfo.Unserialize(stream);
+
+	return packet;
+}
+
+void NetCode::PlayerDisconnectedPacket::Serialize(Nz::ByteStream& stream) const
+{
+	stream << playerIndex;
+}
+
+NetCode::PlayerDisconnectedPacket NetCode::PlayerDisconnectedPacket::Unserialize(Nz::ByteStream& stream)
+{
+	NetCode::PlayerDisconnectedPacket packet;
+	stream >> packet.playerIndex;
+
+	return packet;
+}
+
+void NetCode::PlayerInputPacket::Serialize(Nz::ByteStream& stream) const
 {
 	stream << inputs.moveDown << inputs.moveLeft << inputs.moveRight << inputs.moveUp << inputs.placeBomb;
 }
 
-PlayerInputPacket PlayerInputPacket::Unserialize(Nz::ByteStream& stream)
+NetCode::PlayerInputPacket NetCode::PlayerInputPacket::Unserialize(Nz::ByteStream& stream)
 {
-	PlayerInputPacket packet;
+	NetCode::PlayerInputPacket packet;
 	stream >> packet.inputs.moveDown >> packet.inputs.moveLeft >> packet.inputs.moveRight >> packet.inputs.moveUp >> packet.inputs.placeBomb;
 
 	return packet;
 }
 
-void PlayerPositionsPacket::Serialize(Nz::ByteStream& stream) const
+void NetCode::PlayerPositionsPacket::Serialize(Nz::ByteStream& stream) const
 {
 	Nz::UInt8 playerCount = Nz::SafeCast<Nz::UInt8>(playerPos.size());
 	stream << playerCount;
@@ -65,9 +119,9 @@ void PlayerPositionsPacket::Serialize(Nz::ByteStream& stream) const
 		stream << playerData.playerIndex << playerData.position;
 }
 
-PlayerPositionsPacket PlayerPositionsPacket::Unserialize(Nz::ByteStream& stream)
+NetCode::PlayerPositionsPacket NetCode::PlayerPositionsPacket::Unserialize(Nz::ByteStream& stream)
 {
-	PlayerPositionsPacket packet;
+	NetCode::PlayerPositionsPacket packet;
 	
 	Nz::UInt8 playerCount;
 	stream >> playerCount;

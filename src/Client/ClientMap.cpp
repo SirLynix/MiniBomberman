@@ -47,7 +47,7 @@ void ClientMap::UpdateCell(std::size_t x, std::size_t y, CellType cellType)
 		{
 			assert(cellType == Map::CellType::Stone);
 
-			cellCenter.y += CellSize * 0.5 * 0.9f + 0.01f;
+			cellCenter.y += CellSize * 0.5f * 0.9f + 0.01f;
 
 			entt::entity cube = m_registry.create();
 			auto& cubeNode = m_registry.emplace<Nz::NodeComponent>(cube);
