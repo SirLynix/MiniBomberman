@@ -53,6 +53,7 @@ class ClientGame : public Game
 		std::unique_ptr<ClientMap> m_map;
 		std::vector<std::optional<PlayerInfo>> m_playerInfo;
 		ClientPlayer m_player;
+		State m_currentState;
 };
 
 #include <Client/ClientGame.inl>

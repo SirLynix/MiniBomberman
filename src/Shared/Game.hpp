@@ -8,6 +8,14 @@
 class Game
 {
 	public:
+		enum class State
+		{
+			Waiting,
+			Starting,
+			Playing,
+			Finished
+		};
+
 		Game();
 		Game(const Game&) = delete;
 		Game(Game&&) = delete;

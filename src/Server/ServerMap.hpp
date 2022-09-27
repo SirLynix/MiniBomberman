@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Shared/Map.hpp>
+#include <Nazara/Utils/Signal.hpp>
 #include <array>
 
 class ServerMap final : public Map
@@ -20,6 +21,8 @@ class ServerMap final : public Map
 
 		static constexpr std::size_t Height = 21;
 		static constexpr std::size_t Width = 21;
+
+		NazaraSignal(OnCellCleared, std::size_t /*x*/, std::size_t /*y*/);
 
 	private:
 		std::array<CellType, Width * Height> m_cells;

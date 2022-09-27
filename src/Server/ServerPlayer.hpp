@@ -21,8 +21,6 @@ class ServerPlayer : public Player
 		Nz::ENetPeer* GetPeer() const;
 		const Nz::Vector3f& GetPosition() const;
 
-		void HandlePlaceBomb();
-
 		void SendPacket(Nz::UInt8 channelId, Nz::ENetPacketRef packet);
 		template<typename T> void SendPacket(const T& packet);
 

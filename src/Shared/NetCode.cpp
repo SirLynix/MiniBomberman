@@ -24,8 +24,29 @@ NetCode::BombSpawnPacket NetCode::BombSpawnPacket::Unserialize(Nz::ByteStream& s
 	return packet;
 }
 
+void NetCode::GameStateUpdatePacket::Serialize(Nz::ByteStream& stream) const
+{
+	Nz::UInt8 state = Nz::SafeCast<Nz::UInt8>(newState);
+	stream << state;
+}
+
+NetCode::GameStateUpdatePacket NetCode::GameStateUpdatePacket::Unserialize(Nz::ByteStream& stream)
+{
+	GameStateUpdatePacket packet;
+
+	Nz::UInt8 state;
+	stream >> state;
+
+	packet.newState = Nz::SafeCast<Game::State>(state);
+
+	return packet;
+}
+
 void NetCode::InitialDataPacket::Serialize(Nz::ByteStream& stream) const
 {
+	Nz::UInt8 state = Nz::SafeCast<Nz::UInt8>(gameState);
+	stream << state;
+
 	stream << mapWidth << mapHeight;
 
 	assert(mapCells.size() == mapWidth * mapHeight);
@@ -47,6 +68,12 @@ void NetCode::InitialDataPacket::Serialize(Nz::ByteStream& stream) const
 NetCode::InitialDataPacket NetCode::InitialDataPacket::Unserialize(Nz::ByteStream& stream)
 {
 	NetCode::InitialDataPacket packet;
+
+	Nz::UInt8 state;
+	stream >> state;
+
+	packet.gameState = Nz::SafeCast<Game::State>(state);
+
 	stream >> packet.mapWidth >> packet.mapHeight;
 
 	packet.mapCells.resize(packet.mapWidth * packet.mapHeight);
@@ -70,6 +97,30 @@ NetCode::InitialDataPacket NetCode::InitialDataPacket::Unserialize(Nz::ByteStrea
 
 	return packet;
 }
+
+void NetCode::MapClearCellsPacket::Serialize(Nz::ByteStream& stream) const
+{
+	Nz::UInt16 cellCount = Nz::SafeCast<Nz::UInt16>(cellIds.size());
+	stream << cellCount;
+
+	for (Nz::UInt16 cellId : cellIds)
+		stream << cellId;
+}
+
+NetCode::MapClearCellsPacket NetCode::MapClearCellsPacket::Unserialize(Nz::ByteStream& stream)
+{
+	MapClearCellsPacket packet;
+
+	Nz::UInt16 cellCount;
+	stream >> cellCount;
+
+	packet.cellIds.resize(cellCount);
+	for (Nz::UInt16& cellId : packet.cellIds)
+		stream >> cellId;
+
+	return packet;
+}
+
 
 void NetCode::PlayerConnectedPacket::Serialize(Nz::ByteStream& stream) const
 {

@@ -26,4 +26,7 @@ void ServerMap::UpdateCell(std::size_t x, std::size_t y, CellType cellType)
 	assert(x < Width);
 	assert(y < Height);
 	m_cells[y * Width + x] = cellType;
+
+	if (cellType == Map::CellType::Empty)
+		OnCellCleared(x, y);
 }

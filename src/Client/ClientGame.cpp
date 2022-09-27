@@ -94,9 +94,27 @@ bool ClientGame::OnUpdate(float elapsedTime)
 							break;
 						}
 
+						case NetCode::Opcode::S_GameStateUpdate:
+						{
+							NetCode::GameStateUpdatePacket gameStateUpdate = NetCode::GameStateUpdatePacket::Unserialize(netPacket);
+							m_currentState = gameStateUpdate.newState;
+
+							switch (m_currentState)
+							{
+								case Game::State::Waiting:  fmt::print("Switching to Waiting state\n");  break;
+								case Game::State::Starting: fmt::print("Switching to Starting state\n"); break;
+								case Game::State::Playing:  fmt::print("Switching to Playing state\n");  break;
+								case Game::State::Finished: fmt::print("Switching to Finished state\n"); break;
+							}
+
+							break;
+						}
+
 						case NetCode::Opcode::S_InitialData:
 						{
 							NetCode::InitialDataPacket initialData = NetCode::InitialDataPacket::Unserialize(netPacket);
+
+							m_currentState = initialData.gameState;
 
 							for (std::size_t y = 0; y < initialData.mapHeight; ++y)
 							{
@@ -108,6 +126,15 @@ bool ClientGame::OnUpdate(float elapsedTime)
 
 							for (auto&& playerInfo : initialData.players)
 								CreatePlayer(std::move(playerInfo));
+
+							break;
+						}
+
+						case NetCode::Opcode::S_MapClearCells:
+						{
+							NetCode::MapClearCellsPacket clearCellPacket = NetCode::MapClearCellsPacket::Unserialize(netPacket);
+							for (Nz::UInt16 cellId : clearCellPacket.cellIds)
+								m_map->ClearCell(cellId % Map::Width, cellId / Map::Width);
 
 							break;
 						}

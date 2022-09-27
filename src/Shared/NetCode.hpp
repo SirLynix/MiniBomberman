@@ -3,6 +3,7 @@
 #include <Nazara/Core/ByteStream.hpp>
 #include <Nazara/Math/Vector3.hpp>
 #include <Nazara/Network/ENetPacket.hpp>
+#include <Shared/Game.hpp>
 #include <Shared/Map.hpp>
 #include <Shared/PlayerInputs.hpp>
 #include <cstddef>
@@ -18,7 +19,9 @@ namespace NetCode
 
 		// Sent by server
 		S_BombSpawn,
+		S_GameStateUpdate,
 		S_InitialData,
+		S_MapClearCells,
 		S_PlayerConnected,
 		S_PlayerDisconnected,
 		S_PlayerPositions
@@ -47,6 +50,19 @@ namespace NetCode
 		static BombSpawnPacket Unserialize(Nz::ByteStream& stream);
 	};
 
+	struct GameStateUpdatePacket
+	{
+		static constexpr Opcode OpCode = Opcode::S_GameStateUpdate;
+		static constexpr Nz::ENetPacketFlags Flags = Nz::ENetPacketFlag_Reliable;
+		static constexpr Nz::UInt8 ChannelId = 0;
+
+		Game::State newState;
+
+		void Serialize(Nz::ByteStream& stream) const;
+
+		static GameStateUpdatePacket Unserialize(Nz::ByteStream& stream);
+	};
+
 	struct InitialDataPacket
 	{
 		static constexpr Opcode OpCode = Opcode::S_InitialData;
@@ -58,10 +74,24 @@ namespace NetCode
 		std::vector<Map::CellType> mapCells;
 		Nz::UInt8 playerIndex;
 		std::vector<PlayerInfo> players;
+		Game::State gameState;
 
 		void Serialize(Nz::ByteStream& stream) const;
 
 		static InitialDataPacket Unserialize(Nz::ByteStream& stream);
+	};
+
+	struct MapClearCellsPacket
+	{
+		static constexpr Opcode OpCode = Opcode::S_MapClearCells;
+		static constexpr Nz::ENetPacketFlags Flags = Nz::ENetPacketFlag_Reliable;
+		static constexpr Nz::UInt8 ChannelId = 0;
+
+		std::vector<Nz::UInt16> cellIds;
+
+		void Serialize(Nz::ByteStream& stream) const;
+
+		static MapClearCellsPacket Unserialize(Nz::ByteStream& stream);
 	};
 
 	struct PlayerConnectedPacket

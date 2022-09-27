@@ -36,18 +36,6 @@ const Nz::Vector3f& ServerPlayer::GetPosition() const
 	return m_position;
 }
 
-void ServerPlayer::HandlePlaceBomb()
-{
-	auto [cellX, cellY] = m_game.GetMap().GetCell(m_position);
-
-	fmt::printf("Player #{} placed a bomb on cell X={}, Y={}", m_index, cellX, cellY);
-
-	NetCode::BombSpawnPacket bombSpawn;
-	bombSpawn.position = m_game.GetMap().GetCellCenter(cellX, cellY);
-
-	m_game.BroadcastPacket(bombSpawn);
-}
-
 void ServerPlayer::SendPacket(Nz::UInt8 channelId, Nz::ENetPacketRef packet)
 {
 	m_peer->Send(channelId, std::move(packet));

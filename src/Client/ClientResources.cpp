@@ -103,8 +103,6 @@ void ClientResources::LoadPlayerModel()
 	
 	playerModel = std::make_shared<Nz::Model>(playerGfxMesh, aabb);
 
-	std::string matPath;
-	playerMesh->GetMaterialData(0).GetStringParameter(Nz::MaterialData::BaseColorTexturePath, &matPath);
-
-	playerModel->SetMaterial(0, LoadMaterialFromPath(matPath));
+	if (auto materialPath = playerMesh->GetMaterialData(0).GetStringParameter(Nz::MaterialData::BaseColorTexturePath))
+		playerModel->SetMaterial(0, LoadMaterialFromPath(materialPath.GetValue()));
 }
