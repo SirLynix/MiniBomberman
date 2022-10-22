@@ -3,7 +3,9 @@
 #include <Shared/NetCode.hpp>
 #include <Shared/PlayerInputs.hpp>
 #include <Server/Components/BombComponent.hpp>
+#include <Server/Components/NetworkComponent.hpp>
 #include <Server/Systems/BombSystem.hpp>
+#include <Server/Systems/NetworkSystem.hpp>
 #include <Nazara/Math/Vector2.hpp>
 #include <Nazara/Utility/Components/NodeComponent.hpp>
 #include <Nazara/Utils/Algorithm.hpp>
@@ -25,6 +27,7 @@ m_state(State::Waiting)
 	});
 
 	GetSystemGraph().AddSystem<BombSystem>(*m_map);
+	GetSystemGraph().AddSystem<NetworkSystem>(*this);
 }
 
 void ServerGame::BroadcastPacket(Nz::UInt8 channelId, Nz::ENetPacketRef packet, ServerPlayer* except)
@@ -169,6 +172,8 @@ bool ServerGame::OnUpdate(float /*elapsedTime*/)
 
 				player->SendPacket(initialData);
 
+				GetSystemGraph().GetSystem<NetworkSystem>().CreateAllEntities(*player);
+
 				NetCode::PlayerConnectedPacket connectedPacket;
 				connectedPacket.playerInfo.index = Nz::SafeCast<Nz::UInt8>(playerIndex);
 				connectedPacket.playerInfo.name = player->GetName();
@@ -257,11 +262,7 @@ void ServerGame::HandlePlayerBomb(ServerPlayer& player)
 	bombNode.SetPosition(spawnPos);
 
 	registry.emplace<BombComponent>(bombEntity, 3.f);
-
-	NetCode::BombSpawnPacket bombSpawn;
-	bombSpawn.position = spawnPos;
-
-	BroadcastPacket(bombSpawn);
+	registry.emplace<NetworkComponent>(bombEntity, NetCode::EntityType::Bomb);
 }
 
 void ServerGame::HandlePlayerInputs()

@@ -4,6 +4,7 @@
 #include <Nazara/Graphics/FramePipeline.hpp>
 #include <Nazara/Graphics/Systems.hpp>
 #include <Nazara/Utility/Components.hpp>
+#include <fmt/color.h>
 #include <fmt/core.h>
 #include <stdexcept>
 
@@ -86,11 +87,36 @@ bool ClientGame::OnUpdate(float elapsedTime)
 
 					switch (opcode)
 					{
-						case NetCode::Opcode::S_BombSpawn:
+						case NetCode::Opcode::S_EntityDelete:
 						{
-							NetCode::BombSpawnPacket bombSpawn = NetCode::BombSpawnPacket::Unserialize(netPacket);
+							NetCode::EntityDeletePacket entityDelete = NetCode::EntityDeletePacket::Unserialize(netPacket);
+							fmt::print(stderr, "S_EntityDelete({})\n", entityDelete.networkId);
+							if (entityDelete.networkId >= m_networkedEntities.size() || m_networkedEntities[entityDelete.networkId] == entt::null)
+							{
+								fmt::print(stderr, fmt::fg(fmt::color::red), "Received S_EntityDelete on unknown entity {}, ignoring\n", entityDelete.networkId);
+								break;
+							}
 
-							CreateBomb(bombSpawn.position);
+							GetRegistry().destroy(m_networkedEntities[entityDelete.networkId]);
+							m_networkedEntities[entityDelete.networkId] = entt::null;
+
+							break;
+						}
+
+						case NetCode::Opcode::S_EntitySpawn:
+						{
+							NetCode::EntitySpawnPacket entitySpawn = NetCode::EntitySpawnPacket::Unserialize(netPacket);
+							fmt::print(stderr, "S_EntitySpawn({})\n", entitySpawn.networkId);
+
+							entt::entity entityId = entt::null;
+							if (entitySpawn.type == NetCode::EntityType::Bomb)
+								entityId = CreateBomb(entitySpawn.position);
+
+							if (entitySpawn.networkId >= m_networkedEntities.size())
+								m_networkedEntities.resize(entitySpawn.networkId + 1, entt::null);
+
+							m_networkedEntities[entitySpawn.networkId] = entityId;
+
 							break;
 						}
 
@@ -214,7 +240,7 @@ void ClientGame::OnUpsUpdate(unsigned int ups)
 	m_window->SetTitle("Bomberman - " + std::to_string(ups) + " FPS");
 }
 
-void ClientGame::CreateBomb(const Nz::Vector3f& position)
+entt::entity ClientGame::CreateBomb(const Nz::Vector3f& position)
 {
 	entt::entity bombEntity = GetRegistry().create();
 	auto& bombNode = GetRegistry().emplace<Nz::NodeComponent>(bombEntity);
@@ -222,6 +248,8 @@ void ClientGame::CreateBomb(const Nz::Vector3f& position)
 
 	auto& bombGfx = GetRegistry().emplace<Nz::GraphicsComponent>(bombEntity);
 	bombGfx.AttachRenderable(m_resources.bombModel, 0xFFFFFFFF);
+
+	return bombEntity;
 }
 
 void ClientGame::CreatePlayer(NetCode::PlayerInfo&& netPlayerInfo)

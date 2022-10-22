@@ -12,6 +12,7 @@
 #include <Shared/NetCode.hpp>
 #include <entt/entt.hpp>
 #include <memory>
+#include <unordered_map>
 
 class ClientGame : public Game
 {
@@ -32,7 +33,7 @@ class ClientGame : public Game
 		bool OnUpdate(float elapsedTime) override;
 		void OnUpsUpdate(unsigned int ups) override;
 		
-		void CreateBomb(const Nz::Vector3f& position);
+		entt::entity CreateBomb(const Nz::Vector3f& position);
 		void CreatePlayer(NetCode::PlayerInfo&& netPlayerInfo);
 		void DestroyPlayer(Nz::UInt8 playerIndex);
 		void SetupCamera();
@@ -51,6 +52,7 @@ class ClientGame : public Game
 		Nz::RenderWindow* m_window;
 		ClientResources m_resources;
 		std::unique_ptr<ClientMap> m_map;
+		std::vector<entt::entity> m_networkedEntities;
 		std::vector<std::optional<PlayerInfo>> m_playerInfo;
 		ClientPlayer m_player;
 		State m_currentState;

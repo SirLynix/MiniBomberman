@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Nazara/Core/ByteStream.hpp>
+#include <Nazara/Math/Quaternion.hpp>
 #include <Nazara/Math/Vector3.hpp>
 #include <Nazara/Network/ENetPacket.hpp>
 #include <Shared/Game.hpp>
@@ -18,13 +19,20 @@ namespace NetCode
 		C_PlayerInput,
 
 		// Sent by server
-		S_BombSpawn,
+		S_EntityDelete,
+		S_EntitySpawn,
 		S_GameStateUpdate,
 		S_InitialData,
 		S_MapClearCells,
 		S_PlayerConnected,
 		S_PlayerDisconnected,
 		S_PlayerPositions
+	};
+
+	enum class EntityType
+	{
+		Bomb,
+		Player
 	};
 
 	struct PlayerInfo
@@ -37,17 +45,33 @@ namespace NetCode
 		void Unserialize(Nz::ByteStream& stream);
 	};
 
-	struct BombSpawnPacket
+	struct EntityDeletePacket
 	{
-		static constexpr Opcode OpCode = Opcode::S_BombSpawn;
+		static constexpr Opcode OpCode = Opcode::S_EntityDelete;
 		static constexpr Nz::ENetPacketFlags Flags = Nz::ENetPacketFlag_Reliable;
 		static constexpr Nz::UInt8 ChannelId = 0;
 
-		Nz::Vector3f position;
+		Nz::UInt32 networkId;
 
 		void Serialize(Nz::ByteStream& stream) const;
 
-		static BombSpawnPacket Unserialize(Nz::ByteStream& stream);
+		static EntityDeletePacket Unserialize(Nz::ByteStream& stream);
+	};
+
+	struct EntitySpawnPacket
+	{
+		static constexpr Opcode OpCode = Opcode::S_EntitySpawn;
+		static constexpr Nz::ENetPacketFlags Flags = Nz::ENetPacketFlag_Reliable;
+		static constexpr Nz::UInt8 ChannelId = 0;
+
+		EntityType type;
+		Nz::Quaternionf rotation;
+		Nz::Vector3f position;
+		Nz::UInt32 networkId;
+
+		void Serialize(Nz::ByteStream& stream) const;
+
+		static EntitySpawnPacket Unserialize(Nz::ByteStream& stream);
 	};
 
 	struct GameStateUpdatePacket

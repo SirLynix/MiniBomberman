@@ -11,15 +11,35 @@ void NetCode::PlayerInfo::Unserialize(Nz::ByteStream& stream)
 	stream >> index >> name >> position;
 }
 
-void NetCode::BombSpawnPacket::Serialize(Nz::ByteStream& stream) const
+void NetCode::EntityDeletePacket::Serialize(Nz::ByteStream& stream) const
 {
-	stream << position;
+	stream << networkId;
 }
 
-NetCode::BombSpawnPacket NetCode::BombSpawnPacket::Unserialize(Nz::ByteStream& stream)
+NetCode::EntityDeletePacket NetCode::EntityDeletePacket::Unserialize(Nz::ByteStream& stream)
 {
-	NetCode::BombSpawnPacket packet;
-	stream >> packet.position;
+	EntityDeletePacket packet;
+	stream >> packet.networkId;
+
+	return packet;
+}
+
+void NetCode::EntitySpawnPacket::Serialize(Nz::ByteStream& stream) const
+{
+	Nz::UInt8 typeInt = Nz::SafeCast<Nz::UInt8>(type);
+	stream << typeInt << networkId << position << rotation;
+}
+
+NetCode::EntitySpawnPacket NetCode::EntitySpawnPacket::Unserialize(Nz::ByteStream& stream)
+{
+	NetCode::EntitySpawnPacket packet;
+
+	Nz::UInt8 typeInt;
+	stream >> typeInt;
+
+	packet.type = Nz::SafeCast<EntityType>(typeInt);
+
+	stream >> packet.networkId >> packet.position >> packet.rotation;
 
 	return packet;
 }
